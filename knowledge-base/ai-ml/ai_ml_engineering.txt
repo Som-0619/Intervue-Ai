@@ -1,0 +1,11 @@
+SECTION 1: Retrieval-Augmented Generation (RAG) Systems
+RAG architectures combine dense vector retrieval with Large Language Models to ground model responses in external enterprise data, dramatically reducing hallucinations. Key RAG pipeline stages comprise Document Parsing, Context Chunking (Recursive Character vs. Semantic Chunking), Dense Embedding Generation, Vector Database Indexing (HNSW, IVF-PQ), Hybrid Dense-Sparse Search (BM25 + Cosine Similarity), Reranking (Cross-Encoders), and Contextual Prompt Construction.
+
+SECTION 2: Vector Search & High-Dimensional Embeddings
+High-dimensional dense vector embeddings represent semantic meaning in continuous vector spaces (e.g., 768 or 1536 dimensions). Similarity metrics include Cosine Distance, Euclidean (L2) Distance, and Dot Product. Approximate Nearest Neighbor (ANN) search algorithms like Hierarchical Navigable Small World (HNSW) graphs trade marginal recall accuracy for logarithmic search speed.
+
+SECTION 3: Fine-Tuning, LoRA & Model Compression
+Fine-tuning domain-specific foundation models leverages Parameter-Efficient Fine-Tuning (PEFT) techniques, notably Low-Rank Adaptation (LoRA) and QLoRA. LoRA decomposes weight update matrices into low-rank factorization matrices (A and B), reducing trainable parameters by over 99% while freezing base LLM weights. Quantization (INT8, INT4 AWQ/GPTQ) compresses FP16 model weights to reduce VRAM requirements during inference.
+
+SECTION 4: LLM Evaluation, Guardrails & Hallucination Metrics
+Production LLM deployments enforce strict guardrails (NVIDIA NeMo, Llama Guard) for input sanitization and output safety. Evaluation frameworks (Ragas, DeepEval) measure groundness, context relevance, context recall, and answer correctness using LLM-as-a-Judge paradigms alongside deterministic validation checks.

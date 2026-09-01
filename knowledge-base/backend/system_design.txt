@@ -1,0 +1,5 @@
+SECTION 1: CAP Theorem, PACELC & Distributed Consistency
+The CAP theorem states that a distributed data store can simultaneously provide at most two of Availability, Consistency, and Partition Tolerance. PACELC extends this: in case of Partition (P), choose Availability (A) or Consistency (C); Else (E), choose Latency (L) or Consistency (C).
+
+SECTION 2: Message Queues & Event-Driven Streaming
+Asynchronous event-driven architecture decoupling microservices uses message queues (RabbitMQ, ActiveMQ) and distributed streaming commit logs (Apache Kafka, AWS Kinesis). Kafka stores partition topics as ordered, immutable append-only logs, supporting high-throughput replayable message streams with consumer group offsets.

@@ -1,0 +1,26 @@
+Alex Rivera - Senior AI/ML Engineer
+Email: alex.rivera@example.com | Phone: +1-555-0199
+Location: San Francisco, CA
+
+SUMMARY
+Senior AI/ML Engineer with 4.5+ years of experience building production RAG systems, model fine-tuning pipelines, and high-throughput microservices. Experienced in PyTorch, FastAPI, Vector Databases (ChromaDB, FAISS), Docker, and System Design.
+
+EXPERIENCE
+Senior AI Engineer | NeuralTech Solutions (2022 - Present)
+- Designed and deployed an enterprise Retrieval-Augmented Generation (RAG) platform processing 2M+ daily queries with sub-200ms latency.
+- Implemented parameter-efficient fine-tuning (LoRA / QLoRA) for open-weight foundation models, cutting inference memory footprint by 75%.
+- Built distributed caching and rate-limiting middleware using Redis and FastAPI.
+
+Backend Engineer | DataScale Systems (2020 - 2022)
+- Built high-throughput microservices in Python and Go backed by PostgreSQL and Redis.
+- Designed database indices (B-Tree and LSM-tree) to optimize write performance under high concurrent traffic.
+
+TECHNICAL SKILLS
+- Programming Languages: Python, TypeScript, SQL, Go, C++
+- Frameworks & Libraries: PyTorch, FastAPI, React, Next.js, Django, TensorFlow
+- Tools & Cloud: Docker, Kubernetes, PostgreSQL, Redis, Kafka, AWS, ChromaDB, Git
+- Domains: AI/ML Engineering, RAG Systems, System Design, Distributed Systems
+
+PROJECTS
+- Multi-Modal Enterprise RAG Engine: Built dense vector retrieval pipeline with cross-encoder reranking.
+- Real-Time Model Evaluation Guardrails: Implemented LLM-as-a-Judge evaluation suite with groundness metrics.

@@ -1,0 +1,8 @@
+SECTION 1: Virtual DOM, React Fiber & Reconciliation
+React's reconciliation engine uses the Fiber architecture to break rendering work into small incremental units. Fiber trees track component state, side effects, and DOM mutations, allowing main-thread rendering prioritization, concurrent rendering, and smooth user interactions.
+
+SECTION 2: Server-Side Rendering (SSR), SSG & React Server Components
+Next.js App Router utilizes React Server Components (RSC) to execute component render logic exclusively on the server, streaming HTML and minimal JavaScript bundles to the browser. This eliminates client-side waterfall requests, improves First Contentful Paint (FCP), and guarantees secure data access without exposing API credentials to the client bundle.
+
+SECTION 3: Modern Web Security & Browser Defenses
+Frontend security requires defensive controls against Cross-Site Scripting (XSS), Cross-Site Request Forgery (CSRF), and Clickjacking. Security mechanisms include strict Content Security Policy (CSP) headers, SameSite HTTP-only cookies for session management, and DOM input sanitization.
