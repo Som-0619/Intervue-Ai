@@ -4,6 +4,8 @@ IntervueAI is a production-grade, AI-powered role-based technical interview plat
 
 ---
 
+<img width="2880" height="1624" alt="WhatsApp Image 2026-09-01 at 20 01 26" src="https://github.com/user-attachments/assets/fbc82e74-40a9-420c-b10b-183c45198a73" />
+
 ## Problem
 
 Traditional technical interviews often suffer from three core limitations:
