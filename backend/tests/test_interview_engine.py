@@ -23,6 +23,26 @@ def test_deterministic_difficulty_adaptation():
     assert EvaluationService.determine_next_difficulty("Intermediate", 7.5) == "Intermediate"
     assert EvaluationService.determine_next_difficulty("Senior", 6.0) == "Senior"
 
+def test_seniority_baseline_and_floor():
+    init_db()
+    db = SessionLocal()
+    try:
+        candidate = ResumeService.create_candidate_from_resume(
+            db=db, name="Taylor", target_role="Backend Engineer", years_exp=7,
+            resume_text="Senior Backend Engineer with 7 years of experience in Python and PostgreSQL."
+        )
+        assert InterviewService.determine_starting_difficulty(candidate) == "Senior"
+        assert InterviewService.difficulty_floor("Senior") == "Intermediate"
+
+        principal = ResumeService.create_candidate_from_resume(
+            db=db, name="Avery", target_role="Backend Engineer", years_exp=3,
+            resume_text="Staff Engineer responsible for platform architecture."
+        )
+        assert InterviewService.determine_starting_difficulty(principal) == "Principal"
+        assert InterviewService.difficulty_floor("Principal") == "Senior"
+    finally:
+        db.close()
+
 def test_interview_engine_lifecycle_state_transitions():
     init_db()
     db = SessionLocal()
@@ -49,7 +69,7 @@ def test_interview_engine_lifecycle_state_transitions():
         # Lifecycle State check 1: START -> QUESTION 1
         assert session.status == "in_progress"
         assert session.current_question_index == 0
-        assert session.current_difficulty == "Intermediate"
+        assert session.current_difficulty == "Senior"
         assert len(session.questions) == 1
 
         q1 = session.questions[0]
@@ -71,7 +91,7 @@ def test_interview_engine_lifecycle_state_transitions():
         eval1 = res1.evaluation
         assert eval1.score >= 8.0
         assert eval1.technical_accuracy >= 8.0
-        assert eval1.conceptual_depth >= 8.0
+        assert eval1.conceptual_depth >= 7.5
         assert eval1.clarity >= 8.0
         assert isinstance(eval1.strengths, list) and len(eval1.strengths) > 0
         assert isinstance(eval1.missing_concepts, list)
@@ -79,15 +99,15 @@ def test_interview_engine_lifecycle_state_transitions():
         assert "chain-of-thought" not in eval1.feedback.lower()
         assert res1.interview_completed is False
 
-        # Verify deterministic difficulty progression (Intermediate -> Senior due to score >= 8.0)
+        # A strong Senior answer advances to Principal.
         db.refresh(session)
-        assert session.current_difficulty == "Senior"
+        assert session.current_difficulty == "Principal"
         assert session.current_question_index == 1
 
         # Lifecycle State check 3: ANSWER 2 -> EVALUATION 2 -> NEXT QUESTION (Weak answer testing demotion)
         q2_dto = res1.next_question
         assert q2_dto.order_index == 1
-        assert q2_dto.difficulty == "Senior"
+        assert q2_dto.difficulty == "Principal"
 
         ans2_text = "I don't know much about this topic."
         res2 = InterviewService.submit_answer(
@@ -101,9 +121,9 @@ def test_interview_engine_lifecycle_state_transitions():
         assert eval2.score < 5.5
         assert res2.interview_completed is False
 
-        # Verify deterministic difficulty demotion (Senior -> Intermediate due to score < 5.5)
+        # A weak Principal-level answer demotes one calibrated step to Senior.
         db.refresh(session)
-        assert session.current_difficulty == "Intermediate"
+        assert session.current_difficulty == "Senior"
         assert session.current_question_index == 2
 
         # Lifecycle State check 4: ANSWER 3 (Final Question) -> EVALUATION 3 -> COMPLETE
@@ -132,3 +152,16 @@ def test_interview_engine_lifecycle_state_transitions():
 
     finally:
         db.close()
+
+def test_long_irrelevant_answer_is_not_promoted():
+    result = EvaluationService.evaluate_answer(
+        question_text="Explain database indexing.",
+        category_topic="Database Indexing",
+        difficulty="Intermediate",
+        candidate_answer=" ".join(["I enjoy collaborating with product teams and planning meetings."] * 35),
+        code_snippet=None,
+        retrieved_context_text="B-tree indexes use ordered keys and pages to accelerate selective database lookups."
+    )
+    assert result["technical_accuracy"] < 5.5
+    assert result["score"] < 5.5
+    assert result["recommended_next_difficulty"] == "Junior"

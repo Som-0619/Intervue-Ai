@@ -12,15 +12,38 @@ from app.services.rag_service import RAGService
 from app.services.llm_service import LLMService
 from app.services.report_service import ReportService
 from app.services.question_generator import QuestionGeneratorService
-from app.services.evaluation_service import EvaluationService
+from app.services.evaluation_service import EvaluationService, DIFFICULTY_LEVELS
 
 import logging
 logger = logging.getLogger(__name__)
 
 class InterviewService:
     @staticmethod
+    def determine_starting_difficulty(candidate: Candidate) -> str:
+        """Choose a defensible baseline from explicit experience and leadership signals."""
+        profile = candidate.parsed_profile_json or {}
+        indicators = profile.get("experience_indicators", {})
+        years = max(float(candidate.years_of_experience or 0), float(indicators.get("years_of_experience", 0) or 0))
+        title_text = " ".join(indicators.get("detected_titles", []))
+        title_text = f"{title_text} {candidate.raw_resume_text or ''}".lower()
+
+        if years >= 8 or any(marker in title_text for marker in ("principal", "staff", "architect", "director")):
+            return "Principal"
+        if years >= 5 or any(marker in title_text for marker in ("senior", "lead", "manager")):
+            return "Senior"
+        if years >= 2:
+            return "Intermediate"
+        return "Junior"
+
+    @staticmethod
+    def difficulty_floor(starting_difficulty: str) -> str:
+        """Allow one calibrated demotion, but never collapse an experienced interview to basics."""
+        index = DIFFICULTY_LEVELS.index(starting_difficulty)
+        return DIFFICULTY_LEVELS[max(0, index - 1)]
+
+    @staticmethod
     def select_dynamic_topics(candidate: Candidate, target_role: str, total_count: int = 5) -> List[str]:
-        """Dynamically pick interview topics combining role essentials and candidate strengths/gaps."""
+        """Build a balanced plan: role essentials, demonstrated stack, seniority depth, then gaps."""
         role_lower = target_role.lower()
         parsed = candidate.parsed_profile_json or {}
         gaps = parsed.get("skill_gaps", [])
@@ -37,23 +60,29 @@ class InterviewService:
 
         base_pool = role_topic_pools.get(role_lower, ["System Design", "Database Management", "API Architecture", "Performance Optimization", "Security"])
 
-        selected = []
-        # Add gaps first to probe areas for improvement
-        for gap in gaps:
-            if len(selected) < 2:
-                selected.append(gap)
+        seniority = InterviewService.determine_starting_difficulty(candidate)
+        seniority_topics = {
+            "Junior": ["Implementation Fundamentals", "Testing & Debugging"],
+            "Intermediate": ["Production Debugging & Trade-offs", "Performance Optimization"],
+            "Senior": ["Architecture Trade-offs & Reliability", "Scalability & Failure Recovery"],
+            "Principal": ["Cross-Team Architecture & Evolution", "Technical Strategy & Risk Management"],
+        }[seniority]
 
-        # Add remaining topics from base pool
-        for topic in base_pool:
-            if topic not in selected and len(selected) < total_count:
-                selected.append(topic)
-
-        # Fill with strengths if still needed
-        for strength in strengths:
-            if len(selected) < total_count and strength not in selected:
-                selected.append(f"Advanced {strength}")
-
-        return selected[:total_count]
+        # A five-question default becomes 2 core, 1 proven-skill, 1 seniority-depth, 1 gap.
+        core_count = max(1, round(total_count * 0.4))
+        groups = [
+            base_pool[:core_count],
+            [f"Applied {strength}" for strength in strengths[:2]],
+            seniority_topics,
+            gaps[:2],
+            base_pool[core_count:],
+        ]
+        selected: List[str] = []
+        for group in groups:
+            for topic in group:
+                if topic and topic not in selected and len(selected) < total_count:
+                    selected.append(topic)
+        return selected
 
     @classmethod
     def create_interview(
@@ -62,13 +91,16 @@ class InterviewService:
         candidate_id: str,
         target_role: str,
         total_questions: int = 5,
-        custom_topics: Optional[List[str]] = None
+        custom_topics: Optional[List[str]] = None,
+        initial_difficulty: Optional[str] = None,
     ) -> InterviewSession:
         candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
         if not candidate:
             raise ValueError(f"Candidate with ID '{candidate_id}' not found.")
 
         topics = custom_topics or cls.select_dynamic_topics(candidate, target_role, total_questions)
+        inferred_difficulty = cls.determine_starting_difficulty(candidate)
+        starting_difficulty = initial_difficulty.title() if initial_difficulty and initial_difficulty.title() in DIFFICULTY_LEVELS else inferred_difficulty
 
         interview_id = f"intv_{uuid.uuid4().hex[:10]}"
         session = InterviewSession(
@@ -79,7 +111,7 @@ class InterviewService:
             current_question_index=0,
             total_questions=len(topics),
             selected_topics_json=topics,
-            current_difficulty="Intermediate"
+            current_difficulty=starting_difficulty
         )
         db.add(session)
         db.commit()
@@ -154,7 +186,12 @@ class InterviewService:
         db.add(evaluation)
 
         # 4 & 5. Update session difficulty & current index deterministically based on max existing order index + 1
-        session.current_difficulty = eval_data["recommended_next_difficulty"]
+        proposed_difficulty = eval_data["recommended_next_difficulty"]
+        starting_difficulty = cls.determine_starting_difficulty(session.candidate)
+        floor = cls.difficulty_floor(starting_difficulty)
+        session.current_difficulty = DIFFICULTY_LEVELS[max(
+            DIFFICULTY_LEVELS.index(proposed_difficulty), DIFFICULTY_LEVELS.index(floor)
+        )]
         
         max_index = db.query(func.max(Question.index)).filter(Question.interview_id == session.id).scalar()
         next_index = (max_index + 1) if max_index is not None else (question.order_index + 1)
@@ -242,6 +279,7 @@ class InterviewService:
             rationale=question.rationale,
             retrieved_chunks=chunks,
             retrieved_context_text=question.retrieved_context_text,
-            has_answered=has_ans
+            has_answered=has_ans,
+            rubric=question.rubric_json
         )
 

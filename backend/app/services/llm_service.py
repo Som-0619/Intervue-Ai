@@ -10,6 +10,12 @@ from app.schemas.pydantic_schemas import KnowledgeChunkDTO, EvaluationDTO
 logger = logging.getLogger(__name__)
 
 class LLMService:
+    DIFFICULTY_BLUEPRINTS = {
+        "Junior": "Test core concepts, a small implementation choice, and basic debugging. Avoid broad architecture hypotheticals.",
+        "Intermediate": "Test practical application, diagnosis, implementation trade-offs, and production-safe operation.",
+        "Senior": "Test system design, scaling limits, failure modes, observability, ownership, and explicitly defended trade-offs.",
+        "Principal": "Test cross-team architecture, migration strategy, risk management, organizational constraints, and long-term technical evolution.",
+    }
     @classmethod
     def generate_grounded_question(
         cls,
@@ -40,6 +46,7 @@ class LLMService:
         
         perf_summary = f"Avg Score: {candidate_performance.get('overall_score', 'N/A')}, Missed: {', '.join(candidate_performance.get('missed_concepts', []))}" if candidate_performance else "No previous evaluations"
 
+        difficulty_blueprint = cls.DIFFICULTY_BLUEPRINTS.get(difficulty, cls.DIFFICULTY_BLUEPRINTS["Intermediate"])
         provider = settings.LLM_PROVIDER.lower()
         if provider == "gemini" and settings.GEMINI_API_KEY:
             try:
@@ -70,6 +77,7 @@ RETRIEVED RAG CONTEXT (MUST BE GROUNDED IN THIS TEXT):
 
 REQUIREMENTS:
 1. Generate ONE technical question on '{topic}' tailored for a {difficulty} level {target_role}.
+   Difficulty blueprint: {difficulty_blueprint}
 2. GROUNDING REQUIREMENT: The question MUST directly test specific technical concepts, formulas, trade-offs, or architectures present in the RETRIEVED RAG CONTEXT above.
 3. PERSONALIZATION: Reference candidate background or previous answer performance naturally when applicable.
 4. STRICT NON-REPETITION REQUIREMENT: Do NOT generate a question that is identical or substantially similar to any previous question in text, concept, or structure. Ensure the question tests a different dimension or angle.
@@ -154,12 +162,25 @@ REQUIREMENTS:
             missed = candidate_performance["missed_concepts"][0]
             perf_ref = f"Building on your prior response regarding {missed}, "
 
-        question_angles = [
-            f"{profile_ref}{perf_ref}referencing our core architecture spec for {topic}: '{grounded_snippet}'. How would you design this component to maximize throughput and ensure high availability?",
-            f"{profile_ref}{perf_ref}analyzing the technical spec for {topic}, which notes: '{grounded_snippet}'. What key failure modes, race conditions, or state inconsistencies could arise here, and how would you mitigate them?",
-            f"{profile_ref}evaluating our reference implementation for {topic}: '{grounded_snippet}'. What architectural trade-offs between latency, memory footprint, and consistency would you prioritize for production scale?",
-            f"{profile_ref}{perf_ref}our technical guide for {topic} highlights that '{grounded_snippet}'. How would you write automated unit/integration tests and monitor runtime metrics to safeguard this mechanism?"
-        ]
+        question_angles_by_difficulty = {
+            "Junior": [
+                f"{profile_ref}our guide for {topic} states: '{grounded_snippet}'. Explain the mechanism, then describe a small implementation and one test you would write.",
+                f"{profile_ref}using this reference detail for {topic}: '{grounded_snippet}'. What common implementation mistake would you look for when debugging it, and how would you correct it?",
+            ],
+            "Intermediate": [
+                f"{profile_ref}{perf_ref}referencing the technical spec for {topic}: '{grounded_snippet}'. How would you implement this safely in production, and which trade-offs would you make?",
+                f"{profile_ref}analyzing this {topic} detail: '{grounded_snippet}'. What failure modes could arise, how would you diagnose them, and what would you change?",
+            ],
+            "Senior": [
+                f"{profile_ref}{perf_ref}our architecture specification for {topic} states: '{grounded_snippet}'. Design a production-scale approach, defend the latency/consistency/reliability trade-offs, and explain failure recovery and observability.",
+                f"{profile_ref}given this {topic} constraint: '{grounded_snippet}'. Which scaling bottlenecks and state-consistency failures do you anticipate, and how would you evolve the design without risking availability?",
+            ],
+            "Principal": [
+                f"{profile_ref}our long-term {topic} reference notes: '{grounded_snippet}'. Propose a cross-team architecture and migration strategy, including ownership boundaries, risk controls, and how you would measure whether the investment succeeds.",
+                f"{profile_ref}given this strategic {topic} constraint: '{grounded_snippet}'. How would you choose between competing platform designs across teams, manage the rollout, and preserve a reversible path if assumptions prove wrong?",
+            ],
+        }
+        question_angles = question_angles_by_difficulty.get(difficulty, question_angles_by_difficulty["Intermediate"])
 
         angle_idx = (order_index + attempt - 1) % len(question_angles)
         q_text = question_angles[angle_idx]

@@ -184,6 +184,7 @@ class QuestionGeneratorService:
             candidate_topics=[topic],
             resume_keywords=candidate_skills[:5],
             semantic_query=dynamic_query,
+            difficulty=session.current_difficulty,
             previously_used_chunk_ids=previously_used_chunk_ids,
             top_k=2
         )
@@ -244,6 +245,7 @@ class QuestionGeneratorService:
                 candidate_topics=[alt_topic],
                 resume_keywords=candidate_skills[:5],
                 semantic_query=f"{alt_topic} {session.target_role}",
+                difficulty=session.current_difficulty,
                 previously_used_chunk_ids=previously_used_chunk_ids,
                 top_k=2
             )
@@ -309,6 +311,16 @@ class QuestionGeneratorService:
             retrieved_chunk_ids=chunk_ids,
             rationale=validated_rationale,
             retrieved_context_text=context_text
+            ,rubric_json={
+                "expected_concepts": sorted(list({w for w in re.findall(r"[A-Za-z][A-Za-z0-9_-]{2,}", context_text.lower()) if w not in {"the", "and", "with", "from", "that", "this", "for", "are", "how"}}))[:12],
+                "strong_signals": {
+                    "Junior": ["correct mechanism", "basic implementation", "test case"],
+                    "Intermediate": ["production trade-off", "diagnosis", "safe implementation"],
+                    "Senior": ["scaling trade-off", "failure recovery", "observability"],
+                    "Principal": ["migration strategy", "ownership boundaries", "risk management"],
+                }.get(session.current_difficulty, []),
+                "red_flags": ["generic answer without grounded concepts", "unexplained trade-off", "unsafe production assumption"],
+            }
         )
 
         db.add(question_obj)

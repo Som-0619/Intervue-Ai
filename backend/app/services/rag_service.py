@@ -300,6 +300,7 @@ class RetrievalService:
         candidate_topics: Optional[List[str]] = None,
         resume_keywords: Optional[List[str]] = None,
         semantic_query: str = "",
+        difficulty: str = "Intermediate",
         previously_used_chunk_ids: Optional[List[str]] = None,
         top_k: int = 3
     ) -> List[KnowledgeChunkDTO]:
@@ -322,7 +323,13 @@ class RetrievalService:
                 )
             ]
 
-        query_parts = [semantic_query]
+        difficulty_terms = {
+            "Junior": "fundamentals implementation testing debugging",
+            "Intermediate": "production debugging trade-offs performance",
+            "Senior": "architecture scaling reliability failure recovery observability",
+            "Principal": "cross-team strategy migration risk ownership evolution",
+        }
+        query_parts = [semantic_query, difficulty_terms.get(difficulty, difficulty_terms["Intermediate"])]
         if candidate_topics:
             query_parts.extend(candidate_topics)
         if resume_keywords:
@@ -345,8 +352,10 @@ class RetrievalService:
                     sim = float(np.dot(query_vec, chunk_vec) / (query_norm * chunk_norm))
 
             role_boost = 1.25 if role.lower() in db_chunk.role_category.lower() or db_chunk.role_category.lower() in role.lower() else 1.0
+            difficulty_overlap = len(set(difficulty_terms.get(difficulty, "").split()).intersection(set(re.findall(r"\w+", db_chunk.chunk_text.lower()))))
+            difficulty_boost = 1 + min(0.20, difficulty_overlap * 0.05)
             reuse_penalty = 0.25 if db_chunk.id in previously_used else 1.0
-            final_score = round(sim * role_boost * reuse_penalty, 4)
+            final_score = round(sim * role_boost * difficulty_boost * reuse_penalty, 4)
 
             dto = KnowledgeChunkDTO(
                 id=db_chunk.id,

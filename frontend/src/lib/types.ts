@@ -40,6 +40,7 @@ export interface QuestionDTO {
   retrieved_chunks: KnowledgeChunkDTO[];
   retrieved_context_text?: string;
   has_answered: boolean;
+  rubric?: { expected_concepts: string[]; strong_signals: string[]; red_flags: string[] };
 }
 
 export interface InterviewSessionResponse {

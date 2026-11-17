@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.pydantic_schemas import (
     InterviewCreateRequest, InterviewSessionResponse, QuestionDTO,
-    AnswerSubmitRequest, AnswerEvaluationResponse, InterviewReportResponse
+    AnswerSubmitRequest, AnswerEvaluationResponse, InterviewReportResponse, InterviewControlRequest
 )
 from app.models.domain import InterviewSession, Question
 from app.services.interview_service import InterviewService
@@ -20,7 +20,8 @@ def create_interview(payload: InterviewCreateRequest, db: Session = Depends(get_
             candidate_id=payload.candidate_id,
             target_role=payload.target_role,
             total_questions=payload.total_questions,
-            custom_topics=payload.custom_topics
+            custom_topics=payload.custom_topics,
+            initial_difficulty=payload.initial_difficulty
         )
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -98,3 +99,15 @@ def submit_answer(payload: AnswerSubmitRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail=err_str)
         else:
             raise HTTPException(status_code=400, detail=err_str)
+
+@router.post("/{interview_id}/controls", response_model=InterviewSessionResponse)
+def set_interview_difficulty(interview_id: str, payload: InterviewControlRequest, db: Session = Depends(get_db)):
+    session = db.query(InterviewSession).filter(InterviewSession.id == interview_id).first()
+    difficulty = payload.difficulty.title()
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Interview '{interview_id}' not found.")
+    if session.status != "in_progress" or difficulty not in ["Junior", "Intermediate", "Senior", "Principal"]:
+        raise HTTPException(status_code=400, detail="Choose a valid level for an in-progress interview.")
+    session.current_difficulty = difficulty
+    db.commit()
+    return get_interview(interview_id, db)

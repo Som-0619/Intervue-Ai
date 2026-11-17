@@ -31,3 +31,8 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE questions ADD COLUMN rubric_json JSON;"))
+            conn.commit()
+        except Exception:
+            pass

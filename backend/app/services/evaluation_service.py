@@ -8,6 +8,11 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 DIFFICULTY_LEVELS = ["Junior", "Intermediate", "Senior", "Principal"]
+STOP_WORDS = {
+    "about", "after", "also", "and", "are", "because", "been", "being", "between", "could", "from", "have", "into",
+    "more", "over", "that", "their", "then", "these", "they", "this", "through", "using", "when", "with", "would", "your",
+    "will", "what", "which", "while", "where", "than", "them", "only", "such", "each", "does", "core", "guide"
+}
 
 class EvaluationService:
     @classmethod
@@ -126,36 +131,33 @@ REQUIREMENTS:
             except Exception as e:
                 logger.warning(f"Gemini evaluation failed, falling back to heuristic engine: {e}")
 
-        # --- Rule-Based Heuristic Evaluation Engine ---
+        # --- Rule-Based, concept-grounded evaluation engine ---
+        # Length improves communication only; it cannot establish technical correctness.
         answer_len = len(candidate_answer.strip())
-        code_bonus = 1.0 if code_snippet and len(code_snippet.strip()) > 10 else 0.0
+        code_bonus = 0.5 if code_snippet and len(code_snippet.strip()) > 10 else 0.0
+        tokenise = lambda text: {word for word in re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", text.lower()) if word not in STOP_WORDS}
+        context_terms = tokenise(retrieved_context_text)
+        answer_terms = tokenise(candidate_answer)
+        matched_words = sorted(context_terms.intersection(answer_terms))
+        coverage = len(matched_words) / max(1, min(len(context_terms), 25))
+        tradeoff_signals = {"trade-off", "tradeoffs", "latency", "consistency", "availability", "scalability", "failure", "risk", "monitoring", "rollback"}
+        implementation_signals = {"implement", "test", "metric", "retry", "timeout", "cache", "index", "replica", "transaction"}
+        depth_evidence = len(answer_terms.intersection(tradeoff_signals | implementation_signals))
 
-        ctx_words = set(re.findall(r'\w+', retrieved_context_text.lower())) if retrieved_context_text else set()
-        ans_words = set(re.findall(r'\w+', candidate_answer.lower()))
+        tech_acc = min(10.0, round(2.0 + (len(matched_words) * 1.1) + code_bonus, 1))
+        depth = min(10.0, round(2.0 + (len(matched_words) * 0.65) + (depth_evidence * 0.55), 1))
+        clarity = 3.5 if answer_len < 40 else (6.0 if answer_len < 120 else 7.5)
+        if len(matched_words) >= 5:
+            clarity = min(9.0, clarity + 0.5)
 
-        matched_words = list(ctx_words.intersection(ans_words))
-        
-        if answer_len < 40:
-            tech_acc = 4.0
-            depth = 3.5
-            clarity = 5.0
-            feedback = "The answer was brief and missed core architectural details discussed in reference materials."
-            strengths = ["Basic foundational response"]
-            missing_concepts = ["Detailed trade-offs", "Edge-case error handling", "Implementation specifics"]
-        elif answer_len < 150:
-            tech_acc = min(10.0, 6.5 + code_bonus)
-            depth = 6.5
-            clarity = 7.5
-            feedback = f"Solid foundational explanation on {category_topic}. Touched on key concepts from reference material."
-            strengths = [w.capitalize() for w in matched_words[:3]] if matched_words else ["Foundational understanding"]
-            missing_concepts = ["Distributed failure resilience", "Performance profiling metrics"]
+        strengths = [word.capitalize() for word in matched_words[:5]]
+        missing_concepts = [word.capitalize() for word in sorted(context_terms - answer_terms)[:4]]
+        if not matched_words:
+            feedback = f"The response did not connect to the required technical concepts for {category_topic}; more length alone does not improve the score."
+        elif len(matched_words) < 3:
+            feedback = f"The response mentions some relevant concepts for {category_topic}, but needs more concrete mechanisms, trade-offs, and validation details."
         else:
-            tech_acc = min(10.0, 8.5 + code_bonus)
-            depth = 8.5
-            clarity = 9.0
-            feedback = f"Comprehensive and well-structured answer on {category_topic}. Demonstrated clear technical mastery and practical implementation skills."
-            strengths = [w.capitalize() for w in matched_words[:5]] if matched_words else ["Deep technical mastery", "Clear system breakdown"]
-            missing_concepts = ["Niche optimization edge-cases"]
+            feedback = f"The response is grounded in relevant {category_topic} concepts. Strengthen it further by making trade-offs, failure handling, and validation explicit."
 
         overall_score = round((tech_acc * 0.5) + (depth * 0.3) + (clarity * 0.2), 1)
         next_diff = cls.determine_next_difficulty(difficulty, overall_score)

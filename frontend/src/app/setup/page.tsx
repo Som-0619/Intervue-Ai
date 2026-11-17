@@ -146,12 +146,14 @@ export default function SetupPage() {
       // Seed dynamic focus areas
       const prof = candRes.parsed_profile;
       const initialTopics = [
-        ...(prof?.skill_gaps || []),
-        ...(prof?.strengths || []),
-        'System Architecture'
+        'Role Core Competencies',
+        ...(prof?.strengths || []).slice(0, 1).map(skill => `Applied ${skill}`),
+        yearsExp >= 8 ? 'Cross-Team Architecture & Evolution' : yearsExp >= 5 ? 'Architecture Trade-offs & Reliability' : 'Production Debugging & Trade-offs',
+        ...(prof?.skill_gaps || []).slice(0, 1),
       ].slice(0, 5);
       
       setTopics(initialTopics.length ? initialTopics : ['Core Fundamentals', 'Architecture', 'Performance']);
+      setDifficulty(yearsExp >= 8 ? 'Principal' : yearsExp >= 5 ? 'Senior' : yearsExp >= 2 ? 'Intermediate' : 'Junior');
       setStep(2);
     } catch (err: any) {
       setErrorMsg(err?.response?.data?.detail || err?.message || 'Failed to process resume and profile setup.');
@@ -181,7 +183,8 @@ export default function SetupPage() {
         candidate_id: candidate.id,
         target_role: targetRole,
         total_questions: totalQuestions,
-        custom_topics: topics
+        custom_topics: topics,
+        initial_difficulty: difficulty
       });
 
       router.push(`/interview/${session.id}`);
@@ -470,6 +473,12 @@ export default function SetupPage() {
                   <option value={7}>7 Questions (Comprehensive)</option>
                 </select>
               </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-2">
+              <div className="font-semibold text-emerald-900">Recommended interview plan</div>
+              <p className="text-emerald-800">Starts at <strong>{difficulty}</strong> based on the resume and {yearsExp} years of experience. The interview adapts one level at a time using concept-grounded scoring.</p>
+              <p className="text-emerald-800">Coverage: role essentials, demonstrated stack, seniority-depth scenarios, and a targeted development area.</p>
             </div>
 
             {/* Camera & Mic Device Verification Panel */}

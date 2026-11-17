@@ -35,8 +35,12 @@ export const candidateApi = {
 };
 
 export const interviewApi = {
-  create: async (data: { candidate_id: string; target_role: string; total_questions?: number; custom_topics?: string[] }): Promise<InterviewSessionResponse> => {
+  create: async (data: { candidate_id: string; target_role: string; total_questions?: number; custom_topics?: string[]; initial_difficulty?: string }): Promise<InterviewSessionResponse> => {
     const res = await api.post('/interviews/', data);
+    return res.data;
+  },
+  setDifficulty: async (id: string, difficulty: string): Promise<InterviewSessionResponse> => {
+    const res = await api.post(`/interviews/${id}/controls`, { difficulty });
     return res.data;
   },
   get: async (id: string): Promise<InterviewSessionResponse> => {

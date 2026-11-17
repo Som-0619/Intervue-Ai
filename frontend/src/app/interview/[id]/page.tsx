@@ -84,6 +84,18 @@ export default function InteractiveInterviewPage() {
     }
   };
 
+  const setInterviewerLevel = async (difficulty: string) => {
+    try {
+      setSubmitting(true);
+      const updated = await interviewApi.setDifficulty(interviewId, difficulty);
+      setSession(updated);
+    } catch (err: any) {
+      setErrorMsg(err?.response?.data?.detail || 'Unable to adjust the next question level.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     if (interviewId) {
       fetchSession();
@@ -296,6 +308,14 @@ export default function InteractiveInterviewPage() {
                   </div>
                 )}
 
+                {currentQ.rubric && (
+                  <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+                    <span className="font-semibold">Question rubric: </span>
+                    expected concepts: {currentQ.rubric.expected_concepts.slice(0, 6).join(', ')}.
+                    <div>Strong answer signals: {currentQ.rubric.strong_signals.join(', ')}.</div>
+                  </div>
+                )}
+
                 {/* RAG Context Drawer */}
                 {showTraceability && (
                   <div className="p-4 rounded-xl bg-zinc-900 text-white space-y-3 font-mono text-xs">
@@ -429,6 +449,17 @@ export default function InteractiveInterviewPage() {
 
           {/* Right Column: Video Preview & Roadmap */}
           <div className="lg:col-span-4 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Interviewer controls</CardTitle>
+                <CardDescription className="text-xs">Set the level for the next generated question.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {['Junior', 'Intermediate', 'Senior', 'Principal'].map(level => (
+                  <Button key={level} type="button" size="sm" variant={session?.current_difficulty === level ? 'default' : 'outline'} disabled={submitting} onClick={() => setInterviewerLevel(level)}>{level}</Button>
+                ))}
+              </CardContent>
+            </Card>
             {isVideoOn && (
               <Card className="p-4 bg-zinc-900 text-white space-y-2 overflow-hidden">
                 <div className="flex items-center justify-between text-xs font-mono text-zinc-400">

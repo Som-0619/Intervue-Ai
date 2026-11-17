@@ -61,6 +61,7 @@ class InterviewCreateRequest(BaseModel):
     target_role: str
     total_questions: int = 5
     custom_topics: Optional[List[str]] = None
+    initial_difficulty: Optional[str] = None
 
 class QuestionDTO(BaseModel):
     id: str
@@ -80,6 +81,7 @@ class QuestionDTO(BaseModel):
     retrieved_chunks: List[KnowledgeChunkDTO] = Field(default_factory=list)
     retrieved_context_text: Optional[str] = None
     has_answered: bool = False
+    rubric: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -118,6 +120,9 @@ class AnswerSubmitRequest(BaseModel):
     question_id: str
     candidate_answer_text: str
     code_snippet: Optional[str] = None
+
+class InterviewControlRequest(BaseModel):
+    difficulty: str
 
 class EvaluationDTO(BaseModel):
     id: str

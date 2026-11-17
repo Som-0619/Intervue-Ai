@@ -51,6 +51,7 @@ class Question(Base):
     retrieved_chunk_ids_json = Column(JSON, nullable=True)
     rationale = Column(Text, nullable=True)
     retrieved_context_text = Column(Text, nullable=True)
+    rubric_json = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Synonyms for requested field names
